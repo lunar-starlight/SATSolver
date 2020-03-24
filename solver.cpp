@@ -7,6 +7,8 @@
 #include <functional>
 #include <optional>
 
+int LENGTH;
+
 enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
@@ -109,6 +111,7 @@ Formula parse(/*stdin*/)
 
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
+    LENGTH = number_of_variables;
     // std::cout << number_of_variables << ' ' << number_of_clauses << '\n';
 
     Formula formula;
@@ -156,7 +159,7 @@ std::vector<Literal> pure_literals(const Formula& formula)
         }
         return b;
     };
-    for (size_t i = 0; i < formula.front().term.size(); i++) {
+    for (size_t i = 0; i < LENGTH; i++) {
         Literal lit1 = std::make_pair(i + 1, clause_data::normal);
         Literal lit2 = std::make_pair(i + 1, clause_data::negated);
         bool b1 = is_present_in_formula(lit1);
@@ -201,32 +204,29 @@ std::pair<Literal, Literal> choose_literal(const Formula& formula)
     __builtin_unreachable();
 }
 
-bool DPLL(const Formula& formula)
+bool DPLL(Formula formula)
 {
+    for (auto&& el : unit_clauses(formula)) {
+        formula = unit_propagate(el, formula);
+    }
+    for (auto&& el : pure_literals(formula)) {
+        formula = unit_propagate(el, formula);
+    }
     if (formula.empty()) {
         return true;
     }
     if (contains_empty_clause(formula)) {
         return false;
     }
-    Formula f(formula);
-    for (auto&& el : unit_clauses(f)) {
-        f = unit_propagate(el, f);
-    }
-    for (auto&& el : pure_literals(f)) {
-        f = unit_propagate(el, f);
-    }
-    if (f.empty()) {
+    auto [l, l_] = choose_literal(formula);
+    formula.push_back(clause(l, LENGTH));
+    if (DPLL(formula)) {
         return true;
+    } else {
+        formula.pop_back();
+        formula.push_back(clause(l_, LENGTH));
+        return DPLL(formula);
     }
-    if (contains_empty_clause(f)) {
-        return false;
-    }
-    auto [l, l_] = choose_literal(f);
-    Formula f_ = f;
-    f.push_back(clause(l, formula.front().term.size()));
-    f_.push_back(clause(l_, formula.front().term.size()));
-    return DPLL(f) or DPLL(f_);
 }
 
 int main()
