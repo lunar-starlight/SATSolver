@@ -74,6 +74,27 @@ struct clause {
 
 typedef std::vector<clause> Formula;
 
+void print(const Formula& formula)
+{
+    for (auto&& cl : formula) {
+        std::cout << "(|";
+        for (size_t i = 0; i < cl.term.size(); i++) {
+            switch (cl.term[i]) {
+            case clause_data::normal:
+                std::cout << i << '|';
+                break;
+            case clause_data::negated:
+                std::cout << '!' << i << '|';
+                break;
+            default:
+                break;
+            }
+        }
+        std::cout << ')';
+    }
+    std::cout << '\n';
+}
+
 Formula parse(/*stdin*/)
 {
     char end_of_comment;
@@ -82,10 +103,13 @@ Formula parse(/*stdin*/)
     }
 
     // ignore hardcoded "cnf"
-    std::cin.ignore();
+    std::cin >> end_of_comment;
+    std::cin >> end_of_comment;
+    std::cin >> end_of_comment;
 
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
+    // std::cout << number_of_variables << ' ' << number_of_clauses << '\n';
 
     Formula formula;
     formula.reserve(number_of_clauses);
