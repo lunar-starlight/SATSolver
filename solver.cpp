@@ -191,5 +191,7 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
+    std::cout << DPLL(formula) << '\n';
+
     return 0;
 }
