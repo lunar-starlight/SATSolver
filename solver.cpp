@@ -125,7 +125,7 @@ std::vector<Literal> pure_literals(const Formula& formula)
         }
         return b;
     };
-    for (size_t i = 0; i <  formula.front().term.size(); i++) {
+    for (size_t i = 0; i < formula.front().term.size(); i++) {
         Literal lit;
         if (!is_present_in_formula(lit = std::make_pair(i + 1, clause_data::normal)) ||
             !is_present_in_formula(lit = std::make_pair(i + 1, clause_data::negated))) {
