@@ -23,10 +23,7 @@ struct clause {
             }
         }
     }
-    clause(const clause& cl)
-    {
-        term = cl.term;
-    }
+    clause(const clause& cl) : term(cl.term) {}
 
     std::optional<clause> unit_propagate(const int& literal, const clause_data& mode) const
     {
