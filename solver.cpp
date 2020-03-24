@@ -27,6 +27,12 @@ struct clause {
     }
     clause(const clause& cl) : term(cl.term) {}
 
+    clause(const Literal& lit, const int& length) : term(length, clause_data::unspec)
+    {
+        auto [literal, mode] = lit;
+        term[literal - 1] = mode;
+    }
+
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
         auto [literal, mode] = lit;
@@ -144,6 +150,41 @@ bool contains_empty_clause(const Formula& formula)
         }
     }
     return false;
+}
+
+std::pair<Literal, Literal> choose_literal(const Formula& formula)
+{
+    for (auto&& cl : formula) {
+        for (size_t i = 0; i < cl.term.size(); i++) {
+            if (cl.term[i] != clause_data::unspec) {
+                return std::make_pair(std::make_pair(i + 1, clause_data::normal),
+                                      std::make_pair(i + 1, clause_data::negated));
+            }
+        }
+    }
+    __builtin_unreachable();
+}
+
+bool DPLL(const Formula& formula)
+{
+    if (formula.empty()) {
+        return true;
+    }
+    if (contains_empty_clause(formula)) {
+        return false;
+    }
+    Formula f(formula);
+    for (auto&& el : unit_clauses(f)) {
+        f = unit_propagate(el, f);
+    }
+    for (auto&& el : pure_literals(f)) {
+        f = unit_propagate(el, f);
+    }
+    auto [l, l_] = choose_literal(f);
+    Formula f_ = f;
+    f.push_back(clause(l, formula.front().term.size()));
+    f_.push_back(clause(l_, formula.front().term.size()));
+    return DPLL(f) or DPLL(f_);
 }
 
 int main()
