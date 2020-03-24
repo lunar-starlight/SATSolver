@@ -14,7 +14,7 @@ typedef std::pair<int, clause_data> Literal;
 struct clause {
     std::vector<clause_data> term;
 
-    clause(int length /*, stdin*/) : term(length, clause_data::unspec)
+    clause(const int& length /*, stdin*/) : term(length, clause_data::unspec)
     {
         int reader;
         while ((std::cin >> reader) && reader) {
