@@ -31,27 +31,18 @@ struct clause {
     std::optional<clause> unit_propagate(const int& literal, const clause_data& mode) const
     {
         if (term[literal - 1] == mode) {
+            return std::nullopt;
+        } else if (term[literal - 1] == clause_data::unspec) {
+            return *this;
+        } else {
             clause cl(*this);
             cl.term[literal - 1] = clause_data::unspec;
             return cl;
-        } else {
-            return std::nullopt;
         }
     }
 };
 
 typedef std::vector<clause> Formula;
-
-Formula unit_propagate(const int& literal, const clause_data& mode, const Formula& formula)
-{
-    Formula f; f.reserve(formula.size());
-    for (auto&& e : formula) {
-        if (auto cl = e.unit_propagate(literal, mode)) {
-            f.push_back(*cl);
-        }
-    }
-    return f;
-}
 
 Formula parse(/*stdin*/)
 {
@@ -76,9 +67,19 @@ Formula parse(/*stdin*/)
     return formula;
 }
 
+Formula unit_propagate(const int& literal, const clause_data& mode, const Formula& formula)
+{
+    Formula f; f.reserve(formula.size());
+    for (auto&& e : formula) {
+        if (auto cl = e.unit_propagate(literal, mode)) {
+            f.push_back(*cl);
+        }
+    }
+    return f;
+}
+
 int main()
 {
-
     auto formula = parse(/*stdin*/);
 
     return 0;
