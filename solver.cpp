@@ -37,9 +37,7 @@ struct clause {
         } else {
             return std::nullopt;
         }
-
     }
-
 };
 
 typedef std::vector<clause> Formula;
