@@ -63,6 +63,7 @@ struct clause {
         auto [literal, mode] = lit;
         return term[literal - 1] == mode;
     }
+
 };
 
 typedef std::vector<clause> Formula;
@@ -135,6 +136,15 @@ std::vector<Literal> pure_literals(const Formula& formula)
     return pure;
 }
 
+bool contains_empty_clause(const Formula& formula)
+{
+    for (auto&& cl : formula) {
+        if (cl.term.empty()) {
+            return true;
+        }
+    }
+    return false;
+}
 
 int main()
 {
