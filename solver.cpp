@@ -190,7 +190,7 @@ bool contains_empty_clause(const Formula& formula)
     return false;
 }
 
-std::pair<Literal, Literal> choose_literal(const Formula& formula)
+std::optional<std::pair<Literal, Literal>> choose_literal(const Formula& formula)
 {
     for (auto&& cl : formula) {
         for (size_t i = 0; i < cl.term.size(); i++) {
@@ -200,31 +200,34 @@ std::pair<Literal, Literal> choose_literal(const Formula& formula)
             }
         }
     }
-    print(formula);
-    __builtin_unreachable();
+    return std::nullopt;
 }
 
 bool DPLL(Formula formula)
 {
-    for (auto&& el : unit_clauses(formula)) {
-        formula = unit_propagate(el, formula);
-    }
-    for (auto&& el : pure_literals(formula)) {
-        formula = unit_propagate(el, formula);
-    }
     if (formula.empty()) {
         return true;
     }
     if (contains_empty_clause(formula)) {
         return false;
     }
-    auto [l, l_] = choose_literal(formula);
-    formula.push_back(clause(l, LENGTH));
-    if (DPLL(formula)) {
-        return true;
+    for (auto&& el : unit_clauses(formula)) {
+        formula = unit_propagate(el, formula);
+    }
+    for (auto&& el : pure_literals(formula)) {
+        formula = unit_propagate(el, formula);
+    }
+    if (auto p = choose_literal(formula)) {
+        auto [l, l_] = *p;
+        formula.push_back(clause(l, LENGTH));
+        if (DPLL(formula)) {
+            return true;
+        } else {
+            formula.pop_back();
+            formula.push_back(clause(l_, LENGTH));
+            return DPLL(formula);
+        }
     } else {
-        formula.pop_back();
-        formula.push_back(clause(l_, LENGTH));
         return DPLL(formula);
     }
 }
