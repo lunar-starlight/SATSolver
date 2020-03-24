@@ -92,7 +92,7 @@ void print(const Formula& formula)
         }
         std::cout << ')';
     }
-    std::cout << '\n';
+    std::cout << std::endl;
 }
 
 Formula parse(/*stdin*/)
@@ -150,17 +150,22 @@ std::vector<Literal> pure_literals(const Formula& formula)
     auto is_present_in_formula = [ = ](Literal lit) {
         bool b = false;
         for (auto&& el : formula) {
-            if (!el.has_term(lit)) {
+            if (el.has_term(lit)) {
                 b = true;
             }
         }
         return b;
     };
     for (size_t i = 0; i < formula.front().term.size(); i++) {
-        Literal lit;
-        if (!is_present_in_formula(lit = std::make_pair(i + 1, clause_data::normal)) ||
-            !is_present_in_formula(lit = std::make_pair(i + 1, clause_data::negated))) {
-            pure.push_back(lit);  // if it is not present negated or normal, then it is pure
+        Literal lit1 = std::make_pair(i + 1, clause_data::normal);
+        Literal lit2 = std::make_pair(i + 1, clause_data::negated);
+        bool b1 = is_present_in_formula(lit1);
+        bool b2 = is_present_in_formula(lit2);
+        if (!b1 and b2) {
+            pure.push_back(lit2);
+        }
+        if (b1 and !b2) {
+            pure.push_back(lit1);
         }
     }
     return pure;
@@ -169,7 +174,13 @@ std::vector<Literal> pure_literals(const Formula& formula)
 bool contains_empty_clause(const Formula& formula)
 {
     for (auto&& cl : formula) {
-        if (cl.term.empty()) {
+        bool is_empty = true;
+        for (auto&& el : cl.term) {
+            if (el != clause_data::unspec) {
+                is_empty = false;
+            }
+        }
+        if (is_empty) {
             return true;
         }
     }
@@ -186,6 +197,7 @@ std::pair<Literal, Literal> choose_literal(const Formula& formula)
             }
         }
     }
+    print(formula);
     __builtin_unreachable();
 }
 
@@ -204,6 +216,12 @@ bool DPLL(const Formula& formula)
     for (auto&& el : pure_literals(f)) {
         f = unit_propagate(el, f);
     }
+    if (f.empty()) {
+        return true;
+    }
+    if (contains_empty_clause(f)) {
+        return false;
+    }
     auto [l, l_] = choose_literal(f);
     Formula f_ = f;
     f.push_back(clause(l, formula.front().term.size()));
@@ -214,6 +232,8 @@ bool DPLL(const Formula& formula)
 int main()
 {
     auto formula = parse(/*stdin*/);
+
+    // print(formula);
 
     std::cout << DPLL(formula) << '\n';
 
