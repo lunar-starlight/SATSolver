@@ -50,7 +50,6 @@ struct clause {
     std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
     {
         std::map<int, clause_data> t;
-        // for (auto [literal, mode] : units) {
         for (auto [literal, mode] : term) {
             auto p = units.find(literal);
             if (p == units.end()) {
@@ -109,8 +108,6 @@ struct Formula {
                     break;
                 case clause_data::negated:
                     std::cout << '!' << literal + 1 << '|';
-                    break;
-                default:
                     break;
                 }
             }
@@ -208,58 +205,34 @@ struct Formula {
 
     bool DPLL()
     {
-        // for (auto&& el : pure_literals()) {
-        //     solution.insert(el);
-        //     unit_propagate(el);
-        // }
         auto pures = pure_literals();
         solution.insert(pures.begin(), pures.end());
         unit_propagate(pures);
-        // for (auto&& el : formula) {
-        //     el.unit_propagate(pures);
-        // }
         return _DPLL();
     }
 
     bool _DPLL()
     {
-        // print();
-        // print_solution();
-        // std::cout << "pre_empty" << std::endl;
         if (formula.empty()) {
             return true;
         }
-        // std::cout << "post_empty" << std::endl;
-        // std::cout << "pre_empty_cl" << std::endl;
         if (contains_empty_clause()) {
             return false;
         }
-        // std::cout << "post_empty_cl" << std::endl;
-        // std::cout << "pre_unit" << std::endl;
+
         auto units = unit_clauses();
         solution.insert(units.begin(), units.end());
-        // std::cout << "post_unit" << std::endl;
-        // std::cout << units.size() << std::endl;
         unit_propagate(units);
-        // for (auto&& el : formula) {
-        //     // solution.insert(el);
-        //     el.unit_propagate(units);
-        // }
-        // std::cout << "pre_choose" << std::endl;
+
         if (auto p = choose_literal()) {
+            Formula ff(*this); // copy for branch
             auto [l_, l] = *p;
-            // std::cout << "post_choose" << std::endl;
-            // std::cout << "pre_clone" << std::endl;
-            Formula ff(*this);
-            // std::cout << "post_clone" << std::endl;
-            // std::cout << "pre_prop" << std::endl;
             solution.insert(l);
             unit_propagate(l);
-            // std::cout << "post_prop" << std::endl;
+
             if (_DPLL()) {
                 return true;
             } else {
-                // std::cout << "branch" << std::endl;
                 ff.solution.insert(l_);
                 ff.unit_propagate(l_);
                 return ff._DPLL();
@@ -285,7 +258,6 @@ Formula parse(/*stdin*/)
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
     LENGTH = number_of_variables;
-    // std::cout << number_of_variables << ' ' << number_of_clauses << '\n';
 
     Formula f;
     f.formula.reserve(number_of_clauses);
@@ -301,9 +273,7 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
-    // formula.print();
     std::cout << formula.DPLL() << '\n';
-    // formula.print_solution();
 
     return 0;
 }
