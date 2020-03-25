@@ -257,12 +257,11 @@ Formula parse(/*stdin*/)
     }
 
     // ignore hardcoded "cnf"
-    std::cin >> end_of_comment;
-    std::cin >> end_of_comment;
-    std::cin >> end_of_comment;
+    std::cin.ignore(10, 'f');
 
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
+    
     LENGTH = number_of_variables;
 
     Formula f;
