@@ -51,10 +51,9 @@ struct clause {
     {
         std::map<int, clause_data> t;
         for (auto [literal, mode] : term) {
-            auto p = units.find(literal);
-            if (p == units.end()) {
+            if (term.find(literal) == term.end()) {
                 t[literal] = mode;
-            } else if ((*p).second == mode) {
+            } else if (term.at(literal) == mode) {
                 return std::nullopt;
             }
         }
