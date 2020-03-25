@@ -146,9 +146,10 @@ struct Formula {
         std::map<int, clause_data> units;
         for (auto&& e : formula) {
             if (auto p = e.unit()) {
-                if (units.find((*p).first) == units.end()) {
+                auto [literal, mode] = *p;
+                if (units.find(literal) == units.end()) {
                     units.insert(*p);
-                } else {
+                } else if (units.at(literal) != mode) {
                     return std::nullopt;
                 }
             } else {
