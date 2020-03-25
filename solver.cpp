@@ -140,22 +140,20 @@ std::vector<Literal> unit_clauses(const Formula& formula)
 
 std::vector<Literal> pure_literals(const Formula& formula)
 {
-    std::vector<Literal> pure;
-    // true if literal is a term of any of the clauses in the formula
-    auto is_present_in_formula = [ = ](Literal lit) {
-        bool b = false;
-        for (auto&& el : formula) {
-            if (el.has_term(lit)) {
-                b = true;
-            }
-        }
-        return b;
-    };
+    std::vector<Literal> pure; pure.reserve(LENGTH);
     for (size_t i = 0; i < LENGTH; i++) {
         Literal lit1 = std::make_pair(i, clause_data::normal);
         Literal lit2 = std::make_pair(i, clause_data::negated);
-        bool b1 = is_present_in_formula(lit1);
-        bool b2 = is_present_in_formula(lit2);
+        bool b1 = false;
+        bool b2 = false;
+        for (auto&& el : formula) {
+            if (el.has_term(lit1)) {
+                b1 = true;
+            }
+            if (el.has_term(lit2)) {
+                b2 = true;
+            }
+        }
         if (!b1 and b2) {
             pure.push_back(lit2);
         }
@@ -232,9 +230,9 @@ int main()
 
     // print(formula);
 
-    for (int i = 0; i < 10; i++) {
-        std::cout << DPLL(formula) << '\n';
-    }
+    // for (int i = 0; i < 10; i++) {
+    std::cout << DPLL(formula) << '\n';
+    // }
 
     return 0;
 }
