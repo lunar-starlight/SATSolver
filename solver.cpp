@@ -16,8 +16,8 @@ typedef std::pair<int, clause_data> Literal;
 
 constexpr Literal neg(const Literal& lit)
 {
-    auto [literal, mode] = lit;
-    switch (mode) {
+    auto [literal, polarity] = lit;
+    switch (polarity) {
     case clause_data::normal:
         return std::make_pair(literal, clause_data::negated);
     case clause_data::negated:
@@ -43,17 +43,17 @@ struct clause {
 
     clause(const Literal& lit, const int& length)
     {
-        auto [literal, mode] = lit;
-        term[literal] = mode;
+        auto [literal, polarity] = lit;
+        term[literal] = polarity;
     }
 
     std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
     {
         std::map<int, clause_data> t;
-        for (auto [literal, mode] : term) {
+        for (auto [literal, polarity] : term) {
             if (units.find(literal) == units.end()) {
-                t[literal] = mode;
-            } else if (units.at(literal) == mode) {
+                t[literal] = polarity;
+            } else if (units.at(literal) == polarity) {
                 return std::nullopt;
             }
         }
@@ -63,10 +63,10 @@ struct clause {
 
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
-        auto [literal, mode] = lit;
+        auto [literal, polarity] = lit;
         if (term.find(literal) == term.end()) {
             return *this;
-        } else if (term.at(literal) == mode) {
+        } else if (term.at(literal) == polarity) {
             return std::nullopt;
         } else {
             clause cl(*this);
@@ -99,8 +99,8 @@ struct Formula {
     {
         for (auto&& cl : formula) {
             std::cout << "(|";
-            for (auto&& [literal, mode] : cl.term) {
-                switch (mode) {
+            for (auto&& [literal, polarity] : cl.term) {
+                switch (polarity) {
                 case clause_data::normal:
                     std::cout << literal + 1 << '|';
                     break;
@@ -115,8 +115,8 @@ struct Formula {
     }
     void print_solution() const
     {
-        for (auto&& [literal, mode] : solution) {
-            switch (mode) {
+        for (auto&& [literal, polarity] : solution) {
+            switch (polarity) {
             case clause_data::normal:
                 std::cout << literal + 1 << "=1, ";
                 break;
@@ -146,10 +146,10 @@ struct Formula {
         std::map<int, clause_data> units;
         for (auto&& e : formula) {
             if (auto p = e.unit()) {
-                auto [literal, mode] = *p;
+                auto [literal, polarity] = *p;
                 if (units.find(literal) == units.end()) {
                     units.insert(*p);
-                } else if (units.at(literal) != mode) {
+                } else if (units.at(literal) != polarity) {
                     return std::nullopt;
                 }
             } else {
