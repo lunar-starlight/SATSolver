@@ -219,9 +219,10 @@ struct Formula {
             return false;
         }
 
-        auto units = unit_clauses();
-        solution.insert(units.begin(), units.end());
-        unit_propagate(units);
+        for (auto units = unit_clauses(); !units.empty(); units = unit_clauses()) {
+            solution.insert(units.begin(), units.end());
+            unit_propagate(units);
+        }
 
         if (auto p = choose_literal()) {
             Formula ff(*this); // copy for branch
