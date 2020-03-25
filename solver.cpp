@@ -226,7 +226,6 @@ struct Formula {
                 return false; // contradiction
             }
             solution.insert((*units).begin(), (*units).end());
-            print();
             unit_propagate((*units));
         }
 
