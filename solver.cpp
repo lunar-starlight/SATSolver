@@ -79,7 +79,7 @@ struct clause {
 
 struct Formula {
     std::vector<clause> formula;
-    std::vector<Literal> solution;
+    std::map<int, clause_data> solution;
 
     void print() const
     {
@@ -186,6 +186,15 @@ struct Formula {
 
     bool DPLL()
     {
+        for (auto&& el : pure_literals()) {
+            solution.insert(el);
+            unit_propagate(el);
+        }
+        return _DPLL();
+    }
+
+    bool _DPLL()
+    {
         if (formula.empty()) {
             return true;
         }
@@ -193,25 +202,23 @@ struct Formula {
             return false;
         }
         for (auto&& el : unit_clauses()) {
-            solution.push_back(el);
-            unit_propagate(el);
-        }
-        for (auto&& el : pure_literals()) {
-            solution.push_back(el);
+            solution.insert(el);
             unit_propagate(el);
         }
         if (auto p = choose_literal()) {
-            auto [l, l_] = *p;
+            auto [l_, l] = *p;
             Formula ff(*this);
-            formula.push_back(clause(l, LENGTH));
-            if (DPLL()) {
+            solution.insert(l);
+            unit_propagate(l);
+            if (_DPLL()) {
                 return true;
             } else {
-                ff.formula.push_back(clause(l_, LENGTH));
-                return ff.DPLL();
+                ff.solution.insert(l_);
+                ff.unit_propagate(l_);
+                return ff._DPLL();
             }
         } else {
-            return DPLL();
+            return _DPLL();
         }
     }
 };
