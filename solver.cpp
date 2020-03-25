@@ -10,14 +10,14 @@
 
 int LENGTH;
 
-enum class clause_data : int8_t { normal, negated };
+enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
 
 constexpr Literal neg(const Literal& lit)
 {
-    auto [literal, mode] = lit;
-    switch (mode) {
+    auto [literal, polarity] = lit;
+    switch (polarity) {
     case clause_data::normal:
         return std::make_pair(literal, clause_data::negated);
     case clause_data::negated:
@@ -26,9 +26,9 @@ constexpr Literal neg(const Literal& lit)
 }
 
 struct clause {
-    std::map<int, clause_data> term;
+    std::vector<clause_data> term;
 
-    clause(const int& length /*, stdin*/)
+    clause(const int& length /*, stdin*/) : term(length, clause_data::unspec)
     {
         int reader;
         while ((std::cin >> reader) && reader) {
@@ -41,44 +41,56 @@ struct clause {
     }
     clause(const clause& cl) : term(cl.term) {}
 
-    clause(const Literal& lit, const int& length)
+    clause(const Literal& lit) : term(LENGTH, clause_data::unspec)
     {
-        auto [literal, mode] = lit;
-        term[literal] = mode;
+        auto [literal, polarity] = lit;
+        term[literal] = polarity;
     }
 
     std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
     {
-        std::map<int, clause_data> t;
-        for (auto [literal, mode] : term) {
+        for (int literal = 0; literal < term.size(); literal++) {
             if (units.find(literal) == units.end()) {
-                t[literal] = mode;
-            } else if (units.at(literal) == mode) {
+            } else if (units.at(literal) == term[literal]) {
                 return std::nullopt;
+            } else {
+                term[literal] = clause_data::unspec;
             }
         }
-        term = t;
         return *this;
     }
 
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
-        auto [literal, mode] = lit;
-        if (term.find(literal) == term.end()) {
+        auto [literal, polarity] = lit;
+        if (term[literal] == clause_data::unspec) {
             return *this;
-        } else if (term.at(literal) == mode) {
+        } else if (term[literal] == polarity) {
             return std::nullopt;
         } else {
-            clause cl(*this);
-            cl.term.erase(literal);
+            clause cl(*this); // TODO: remove expensive copy
+            cl.term[literal] = clause_data::unspec;
             return cl;
         }
     }
 
     std::optional<Literal> unit() const
     {
-        if (term.size() == 1) {
-            return *term.begin();
+
+        bool b = false;
+        int k;
+        for (int i = 0; i < LENGTH; i++) {
+            if (term[i] != clause_data::unspec) {
+                if (b) {
+                    b = false;
+                    break;
+                }
+                b = true;
+                k = i;
+            }
+        }
+        if (b) {
+            return std::make_pair(k, term[k]);
         } else {
             return std::nullopt;
         }
@@ -86,7 +98,7 @@ struct clause {
 
     bool has_term(const Literal& lit) const
     {
-        return term.find(lit.first) != term.end();
+        return term[lit.first] != clause_data::unspec;
     }
 
 };
@@ -99,8 +111,8 @@ struct Formula {
     {
         for (auto&& cl : formula) {
             std::cout << "(|";
-            for (auto&& [literal, mode] : cl.term) {
-                switch (mode) {
+            for (int literal = 0; literal < LENGTH; literal++) {
+                switch (cl.term[literal]) {
                 case clause_data::normal:
                     std::cout << literal + 1 << '|';
                     break;
@@ -115,8 +127,8 @@ struct Formula {
     }
     void print_solution() const
     {
-        for (auto&& [literal, mode] : solution) {
-            switch (mode) {
+        for (auto&& [literal, polarity] : solution) {
+            switch (polarity) {
             case clause_data::normal:
                 std::cout << literal + 1 << "=1, ";
                 break;
@@ -146,11 +158,11 @@ struct Formula {
         std::map<int, clause_data> units;
         for (auto&& e : formula) {
             if (auto p = e.unit()) {
-                auto [literal, mode] = *p;
+                auto [literal, polarity] = *p;
                 if (units.find(literal) == units.end()) {
                     units.insert(*p);
-                } else if (units.at(literal) != mode) {
-                    return std::nullopt;
+                } else if (units.at(literal) != polarity) {
+                    return std::nullopt; // contradiction
                 }
             } else {
                 f.push_back(e);
@@ -199,8 +211,10 @@ struct Formula {
     std::optional<std::pair<Literal, Literal>> choose_literal() const
     {
         for (auto&& cl : formula) {
-            if (!cl.term.empty()) {
-                return std::make_pair(*cl.term.begin(), neg(*cl.term.begin()));
+            for (int literal = 0; literal < LENGTH; ++literal) {
+                if (cl.term[literal] != clause_data::unspec) {
+                    return std::make_pair(std::make_pair(literal, clause_data::negated), std::make_pair(literal, clause_data::normal));
+                }
             }
         }
         return std::nullopt;
@@ -222,7 +236,7 @@ struct Formula {
         if (contains_empty_clause()) {
             return false;
         }
-        for (auto units = unit_clauses(); units.has_value() && !(*units).empty(); units = unit_clauses()) {
+        for (auto units = unit_clauses(); !units.has_value() || !(*units).empty(); units = unit_clauses()) {
             if (!units.has_value()) {
                 return false; // contradiction
             }
@@ -232,7 +246,7 @@ struct Formula {
 
         if (auto p = choose_literal()) {
             Formula ff(*this); // copy for branch
-            auto [l_, l] = *p;
+            auto [l, l_] = *p;
             solution.insert(l);
             unit_propagate(l);
 
@@ -261,7 +275,7 @@ Formula parse(/*stdin*/)
 
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
-    
+
     LENGTH = number_of_variables;
 
     Formula f;
