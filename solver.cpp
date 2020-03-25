@@ -51,9 +51,9 @@ struct clause {
     {
         std::map<int, clause_data> t;
         for (auto [literal, mode] : term) {
-            if (term.find(literal) == term.end()) {
+            if (units.find(literal) == units.end()) {
                 t[literal] = mode;
-            } else if (term.at(literal) == mode) {
+            } else if (units.at(literal) == mode) {
                 return std::nullopt;
             }
         }
@@ -64,10 +64,9 @@ struct clause {
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
         auto [literal, mode] = lit;
-        auto p = term.find(literal);
-        if (p == term.end()) {
+        if (term.find(literal) == term.end()) {
             return *this;
-        } else if ((*p).second == mode) {
+        } else if (term.at(literal) == mode) {
             return std::nullopt;
         } else {
             clause cl(*this);
@@ -141,13 +140,17 @@ struct Formula {
         formula = f;
     }
 
-    std::map<int, clause_data> unit_clauses()
+    std::optional<std::map<int, clause_data>> unit_clauses()
     {
         std::vector<clause> f; f.reserve(formula.size());
         std::map<int, clause_data> units;
         for (auto&& e : formula) {
             if (auto p = e.unit()) {
-                units.insert(*p);
+                if (units.find((*p).first) == units.end()) {
+                    units.insert(*p);
+                } else {
+                    return std::nullopt;
+                }
             } else {
                 f.push_back(e);
             }
@@ -218,10 +221,12 @@ struct Formula {
         if (contains_empty_clause()) {
             return false;
         }
-
-        for (auto units = unit_clauses(); !units.empty(); units = unit_clauses()) {
-            solution.insert(units.begin(), units.end());
-            unit_propagate(units);
+        for (auto units = unit_clauses(); units.has_value() && !(*units).empty(); units = unit_clauses()) {
+            if (!units.has_value()) {
+                return false; // contradiction
+            }
+            solution.insert((*units).begin(), (*units).end());
+            unit_propagate((*units));
         }
 
         if (auto p = choose_literal()) {
