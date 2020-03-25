@@ -47,12 +47,29 @@ struct clause {
         term[literal] = mode;
     }
 
+    std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
+    {
+        std::map<int, clause_data> t;
+        // for (auto [literal, mode] : units) {
+        for (auto [literal, mode] : term) {
+            auto p = units.find(literal);
+            if (p == units.end()) {
+                t[literal] = mode;
+            } else if ((*p).second == mode) {
+                return std::nullopt;
+            }
+        }
+        term = t;
+        return *this;
+    }
+
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
         auto [literal, mode] = lit;
-        if (term.find(literal) == term.end()) {
+        auto p = term.find(literal);
+        if (p == term.end()) {
             return *this;
-        } else if (term.at(literal) == mode) {
+        } else if ((*p).second == mode) {
             return std::nullopt;
         } else {
             clause cl(*this);
@@ -116,31 +133,36 @@ struct Formula {
         std::cout << std::endl;
     }
 
-    void unit_propagate(const Literal& literal)
+    template<typename T>
+    void unit_propagate(const T& units)
     {
         std::vector<clause> f; f.reserve(formula.size());
         for (auto&& e : formula) {
-            if (auto cl = e.unit_propagate(literal)) {
+            if (auto cl = e.unit_propagate(units)) {
                 f.push_back(*cl);
             }
         }
         formula = f;
     }
 
-    std::vector<Literal> unit_clauses() const
+    std::map<int, clause_data> unit_clauses()
     {
-        std::vector<Literal> units;
+        std::vector<clause> f; f.reserve(formula.size());
+        std::map<int, clause_data> units;
         for (auto&& e : formula) {
             if (auto p = e.unit()) {
-                units.push_back(*p);
+                units.insert(*p);
+            } else {
+                f.push_back(e);
             }
         }
+        formula = f;
         return units;
     }
 
-    std::vector<Literal> pure_literals() const
+    std::map<int, clause_data> pure_literals() const
     {
-        std::vector<Literal> pure; pure.reserve(LENGTH);
+        std::map<int, clause_data> pure;
         for (size_t i = 0; i < LENGTH; i++) {
             Literal lit1 = std::make_pair(i, clause_data::normal);
             Literal lit2 = std::make_pair(i, clause_data::negated);
@@ -155,10 +177,10 @@ struct Formula {
                 }
             }
             if (!b1 and b2) {
-                pure.push_back(lit2);
+                pure.insert(lit2);
             }
             if (b1 and !b2) {
-                pure.push_back(lit1);
+                pure.insert(lit1);
             }
         }
         return pure;
@@ -186,33 +208,58 @@ struct Formula {
 
     bool DPLL()
     {
-        for (auto&& el : pure_literals()) {
-            solution.insert(el);
-            unit_propagate(el);
-        }
+        // for (auto&& el : pure_literals()) {
+        //     solution.insert(el);
+        //     unit_propagate(el);
+        // }
+        auto pures = pure_literals();
+        solution.insert(pures.begin(), pures.end());
+        unit_propagate(pures);
+        // for (auto&& el : formula) {
+        //     el.unit_propagate(pures);
+        // }
         return _DPLL();
     }
 
     bool _DPLL()
     {
+        // print();
+        // print_solution();
+        // std::cout << "pre_empty" << std::endl;
         if (formula.empty()) {
             return true;
         }
+        // std::cout << "post_empty" << std::endl;
+        // std::cout << "pre_empty_cl" << std::endl;
         if (contains_empty_clause()) {
             return false;
         }
-        for (auto&& el : unit_clauses()) {
-            solution.insert(el);
-            unit_propagate(el);
-        }
+        // std::cout << "post_empty_cl" << std::endl;
+        // std::cout << "pre_unit" << std::endl;
+        auto units = unit_clauses();
+        solution.insert(units.begin(), units.end());
+        // std::cout << "post_unit" << std::endl;
+        // std::cout << units.size() << std::endl;
+        unit_propagate(units);
+        // for (auto&& el : formula) {
+        //     // solution.insert(el);
+        //     el.unit_propagate(units);
+        // }
+        // std::cout << "pre_choose" << std::endl;
         if (auto p = choose_literal()) {
             auto [l_, l] = *p;
+            // std::cout << "post_choose" << std::endl;
+            // std::cout << "pre_clone" << std::endl;
             Formula ff(*this);
+            // std::cout << "post_clone" << std::endl;
+            // std::cout << "pre_prop" << std::endl;
             solution.insert(l);
             unit_propagate(l);
+            // std::cout << "post_prop" << std::endl;
             if (_DPLL()) {
                 return true;
             } else {
+                // std::cout << "branch" << std::endl;
                 ff.solution.insert(l_);
                 ff.unit_propagate(l_);
                 return ff._DPLL();
@@ -254,6 +301,7 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
+    // formula.print();
     std::cout << formula.DPLL() << '\n';
     // formula.print_solution();
 
