@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -8,15 +7,15 @@
 #include <optional>
 #include <map>
 
-int LENGTH;
 
 enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
 
-constexpr Literal neg(const Literal& lit)
+Literal neg(const Literal& lit)
 {
     auto [literal, polarity] = lit;
+    std::cerr << "as";
     switch (polarity) {
     case clause_data::normal:
         return std::make_pair(literal, clause_data::negated);
@@ -29,7 +28,9 @@ constexpr Literal neg(const Literal& lit)
 struct clause {
     std::vector<clause_data> term;
 
-    clause(const int& length /*, stdin*/) : term(length, clause_data::unspec)
+    clause() {}
+    
+    clause(const int length /*, stdin*/) : term(length, clause_data::unspec)
     {
         int reader;
         while ((std::cin >> reader) && reader) {
@@ -40,79 +41,89 @@ struct clause {
             }
         }
     }
-    clause(const clause& cl) : term(cl.term) {}
 
+
+    clause(const clause& cl) : term(cl.term) {}
+    /*
     clause(const Literal& lit) : term(LENGTH, clause_data::unspec)
     {
         auto [literal, polarity] = lit;
         term[literal] = polarity;
-    }
+    }*/
 
-    std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
+    std::optional<clause> unit_propagate_group(clause units)
     {
-        for (int literal = 0; literal < term.size(); literal++) {
-            if (units.find(literal) == units.end()) {
-            } else if (units.at(literal) == term[literal]) {
+        clause cl(*this); // make lazy construction?
+
+        for (auto literal = 0ul; literal < term.size(); ++literal) {
+            if (units.term[literal] == clause_data::unspec) continue;
+
+            // propagate all units
+            if (units.term[literal] == term[literal]) {
                 return std::nullopt;
-            } else {
-                term[literal] = clause_data::unspec;
+            } else { //if clause contains negation
+                cl.term[literal] = clause_data::unspec;
             }
         }
-        return *this;
+        return cl;
     }
 
-    std::optional<clause> unit_propagate(const Literal& lit) const
+    std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity) const
     {
-        auto [literal, polarity] = lit;
-        if (term[literal] == clause_data::unspec) {
+        if (term[lit] == clause_data::unspec) {
             return *this;
-        } else if (term[literal] == polarity) {
+        } else if (term[lit] == polarity) {
             return std::nullopt;
         } else {
             clause cl(*this); // TODO: remove expensive copy
-            cl.term[literal] = clause_data::unspec;
+            cl.term[lit] = clause_data::unspec;
             return cl;
         }
     }
 
-    std::optional<Literal> unit() const
-    {
-
-        bool b = false;
-        int k;
-        for (int i = 0; i < LENGTH; i++) {
-            if (term[i] != clause_data::unspec) {
-                if (b) {
-                    b = false;
-                    break;
-                }
-                b = true;
-                k = i;
-            }
+    bool empty() {
+        for (auto&& x : term) {
+            if (x != clause_data::unspec)
+                return false;
         }
-        if (b) {
-            return std::make_pair(k, term[k]);
-        } else {
-            return std::nullopt;
-        }
+        return true;
     }
 
-    bool has_term(const Literal& lit) const
-    {
-        return term[lit.first] != clause_data::unspec;
+    std::optional<size_t> unit() {
+        // {} if it isn't
+        // index of truth value if it is
+        bool indicator = false;
+        size_t index = 0;
+
+        for (size_t i = 0; i < term.size(); ++i) {
+            if (indicator && term[i] != clause_data::unspec) {
+                return {};
+            }
+
+            // find first non-unspec
+            if (term[i] != clause_data::unspec) {
+                indicator = true;
+                index = i;
+            }
+        }
+        if (indicator) { // at least one found
+            return index;
+        }
+        return {};
     }
 
 };
 
 struct Formula {
     std::vector<clause> formula;
-    std::map<int, clause_data> solution;
+    size_t clause_length;
+    clause solution;
 
     void print() const
     {
         for (auto&& cl : formula) {
             std::cout << "(|";
-            for (int literal = 0; literal < LENGTH; literal++) {
+            for (int literal = 0; literal < clause_length; literal++) {
                 switch (cl.term[literal]) {
                 case clause_data::normal:
                     std::cout << literal + 1 << '|';
@@ -126,74 +137,88 @@ struct Formula {
         }
         std::cout << std::endl;
     }
+
     void print_solution() const
     {
-        for (auto&& [literal, polarity] : solution) {
-            switch (polarity) {
+        for (size_t x = 0; x < clause_length; ++x) {
+            switch (solution.term[x]) {
             case clause_data::normal:
-                std::cout << literal + 1 << "=1, ";
+                std::cout << x + 1 << "=1, ";
                 break;
             case clause_data::negated:
-                std::cout << literal + 1 << "=0, ";
+                std::cout << x + 1 << "=0, ";
                 break;
             }
         }
         std::cout << std::endl;
     }
 
-    template<typename T>
-    void unit_propagate(const T& units)
+
+    void unit_propagate_group(clause units)
     {
+        // https://en.wikipedia.org/wiki/Unit_propagation
         std::vector<clause> f; f.reserve(formula.size());
         for (auto&& e : formula) {
-            if (auto cl = e.unit_propagate(units)) {
+            if (auto cl = e.unit_propagate_group(units)) {
                 f.push_back(*cl);
             }
         }
         formula = f;
     }
 
-    std::optional<std::map<int, clause_data>> unit_clauses()
-    {
+    void unit_propagate_single(size_t index, clause_data polarity) {
         std::vector<clause> f; f.reserve(formula.size());
-        std::map<int, clause_data> units;
         for (auto&& e : formula) {
-            if (auto p = e.unit()) {
-                auto [literal, polarity] = *p;
-                if (units.find(literal) == units.end()) {
-                    units.insert(*p);
-                } else if (units.at(literal) != polarity) {
-                    return std::nullopt; // contradiction
-                }
-            } else {
-                f.push_back(e);
+            if (auto cl = e.unit_propagate_one(index, polarity)) {
+                f.push_back(*cl);
             }
         }
         formula = f;
+    }
+
+    std::optional<clause> unit_clauses()
+    {
+        // returns a clause containing all units and their polarity
+        clause units;
+        units.term.resize(clause_length, clause_data::unspec);
+
+        // note check for contradiction
+        for (auto&& e : formula) {
+            if (auto p = e.unit(); p.has_value()) { // has_value unnecessary?
+                // e[p] is unital then
+                if (units.term[p.value()] != clause_data::unspec &&
+                    e.term[p.value()] != units.term[p.value()])
+                    return {}; // contradiction
+                units.term[p.value()] = e.term[p.value()];
+            }
+        }
+
         return units;
     }
 
-    std::map<int, clause_data> pure_literals() const
+    clause pure_literals()
     {
-        std::map<int, clause_data> pure;
-        for (size_t i = 0; i < LENGTH; i++) {
-            Literal lit1 = std::make_pair(i, clause_data::normal);
-            Literal lit2 = std::make_pair(i, clause_data::negated);
+        // returns a clause which describes the literals
+        // the elements with unspec aren't literals,
+        // elements with clause::normal are normal, negated are negated literals
+        clause pure;
+        pure.term.resize(clause_length, clause_data::unspec);
+
+        for (size_t i = 0; i < clause_length; ++i) {
             bool b1 = false;
             bool b2 = false;
             for (auto&& el : formula) {
-                if (el.has_term(lit1)) {
-                    b1 = true;
-                }
-                if (el.has_term(lit2)) {
-                    b2 = true;
+                switch (el.term[i]) {
+                    case clause_data::normal: b1 = true;
+                    case clause_data::negated: b2 = true;
+                    case clause_data::unspec: ;
                 }
             }
             if (!b1 and b2) {
-                pure.insert(lit2);
+                pure.term[i] = clause_data::negated;
             }
             if (b1 and !b2) {
-                pure.insert(lit1);
+                pure.term[i] = clause_data::normal;
             }
         }
         return pure;
@@ -209,12 +234,12 @@ struct Formula {
         return false;
     }
 
-    std::optional<std::pair<Literal, Literal>> choose_literal() const
+    std::optional<size_t> choose_literal() const
     {
         for (auto&& cl : formula) {
-            for (int literal = 0; literal < LENGTH; ++literal) {
+            for (size_t literal = 0; literal < clause_length; ++literal) {
                 if (cl.term[literal] != clause_data::unspec) {
-                    return std::make_pair(std::make_pair(literal, clause_data::negated), std::make_pair(literal, clause_data::normal));
+                    return literal;
                 }
             }
         }
@@ -231,25 +256,34 @@ bool recursive_DPLL(Formula& expr)
     if (expr.contains_empty_clause()) {
         return false;
     }
-    for (auto units = expr.unit_clauses(); !units.has_value() || !(*units).empty(); units = expr.unit_clauses()) {
+    // !units.has_value() || !(*units).empty();
+    // {} or it has actual values
+    for (auto units = expr.unit_clauses(); !units.has_value() || !units.value().empty(); units = expr.unit_clauses()) {
         if (!units.has_value()) {
             return false; // contradiction
         }
-        expr.solution.insert((*units).begin(), (*units).end());
-        expr.unit_propagate((*units));
+ 
+        // do we have to check?
+        for (size_t i = 0; i < expr.clause_length; ++i) {
+            if (expr.solution.term[i] != clause_data::unspec &&
+                expr.solution.term[i] != units.value().term[i]
+            ) return false;
+            expr.solution.term[i] = units.value().term[i];
+        }
+    
+        expr.unit_propagate_group(units.value());
     }
     
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
-        auto [l, l_] = *p;
-        expr.solution.insert(l);
-        expr.unit_propagate(l);
+        expr.solution.term[p.value()] = clause_data::normal;
+        expr.unit_propagate_single(p.value(), clause_data::normal);
         
         if (recursive_DPLL(expr)) {
             return true;
         } else {
-            ff.solution.insert(l_);
-            ff.unit_propagate(l_);
+            ff.solution.term[p.value()] = clause_data::negated;
+            ff.unit_propagate_single(p.value(), clause_data::negated);
             return recursive_DPLL(ff);
         }
     } else {
@@ -260,8 +294,8 @@ bool recursive_DPLL(Formula& expr)
 bool DPLL(Formula& expr)
 {
     auto pures = expr.pure_literals();
-    expr.solution.insert(pures.begin(), pures.end());
-    expr.unit_propagate(pures);
+    expr.solution = pures;
+    expr.unit_propagate_group(pures);
     return recursive_DPLL(expr);
 }
 
@@ -278,9 +312,9 @@ Formula parse(/*stdin*/)
     int number_of_variables, number_of_clauses;
     std::cin >> number_of_variables >> number_of_clauses;
 
-    LENGTH = number_of_variables;
 
     Formula f;
+    f.clause_length = number_of_variables;
     f.formula.reserve(number_of_clauses);
 
     for (int i = 0; i < number_of_clauses; ++i) {
