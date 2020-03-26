@@ -23,6 +23,7 @@ constexpr Literal neg(const Literal& lit)
     case clause_data::negated:
         return std::make_pair(literal, clause_data::normal);
     }
+    std::cerr << "test";
 }
 
 struct clause {
@@ -219,49 +220,50 @@ struct Formula {
         }
         return std::nullopt;
     }
-
-    bool DPLL()
-    {
-        auto pures = pure_literals();
-        solution.insert(pures.begin(), pures.end());
-        unit_propagate(pures);
-        return _DPLL();
-    }
-
-    bool _DPLL()
-    {
-        if (formula.empty()) {
-            return true;
-        }
-        if (contains_empty_clause()) {
-            return false;
-        }
-        for (auto units = unit_clauses(); !units.has_value() || !(*units).empty(); units = unit_clauses()) {
-            if (!units.has_value()) {
-                return false; // contradiction
-            }
-            solution.insert((*units).begin(), (*units).end());
-            unit_propagate((*units));
-        }
-
-        if (auto p = choose_literal()) {
-            Formula ff(*this); // copy for branch
-            auto [l, l_] = *p;
-            solution.insert(l);
-            unit_propagate(l);
-
-            if (_DPLL()) {
-                return true;
-            } else {
-                ff.solution.insert(l_);
-                ff.unit_propagate(l_);
-                return ff._DPLL();
-            }
-        } else {
-            return _DPLL();
-        }
-    }
 };
+
+
+bool recursive_DPLL(Formula& expr)
+{
+    if (expr.formula.empty()) {
+        return true;
+    }
+    if (expr.contains_empty_clause()) {
+        return false;
+    }
+    for (auto units = expr.unit_clauses(); !units.has_value() || !(*units).empty(); units = expr.unit_clauses()) {
+        if (!units.has_value()) {
+            return false; // contradiction
+        }
+        expr.solution.insert((*units).begin(), (*units).end());
+        expr.unit_propagate((*units));
+    }
+    
+    if (auto p = expr.choose_literal()) {
+        Formula ff(expr); // copy for branch
+        auto [l, l_] = *p;
+        expr.solution.insert(l);
+        expr.unit_propagate(l);
+        
+        if (recursive_DPLL(expr)) {
+            return true;
+        } else {
+            ff.solution.insert(l_);
+            ff.unit_propagate(l_);
+            return recursive_DPLL(ff);
+        }
+    } else {
+        return recursive_DPLL(expr);
+    }
+}
+
+bool DPLL(Formula& expr)
+{
+    auto pures = expr.pure_literals();
+    expr.solution.insert(pures.begin(), pures.end());
+    expr.unit_propagate(pures);
+    return recursive_DPLL(expr);
+}
 
 Formula parse(/*stdin*/)
 {
@@ -292,7 +294,7 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
-    std::cout << formula.DPLL() << '\n';
+    std::cout << DPLL(formula) << '\n';
 
     return 0;
 }
