@@ -21,15 +21,17 @@ Literal neg(const Literal& lit)
         return std::make_pair(literal, clause_data::negated);
     case clause_data::negated:
         return std::make_pair(literal, clause_data::normal);
+    case clause_data::unspec: ;
     }
     std::cerr << "test";
+    __builtin_unreachable();
 }
 
 struct clause {
     std::vector<clause_data> term;
 
     clause() {}
-    
+
     clause(const int length /*, stdin*/) : term(length, clause_data::unspec)
     {
         int reader;
@@ -56,7 +58,9 @@ struct clause {
         clause cl(*this); // make lazy construction?
 
         for (auto literal = 0ul; literal < term.size(); ++literal) {
-            if (units.term[literal] == clause_data::unspec) continue;
+            if (units.term[literal] == clause_data::unspec) {
+                continue;
+            }
 
             // propagate all units
             if (units.term[literal] == term[literal]) {
@@ -81,15 +85,18 @@ struct clause {
         }
     }
 
-    bool empty() {
+    bool empty()
+    {
         for (auto&& x : term) {
-            if (x != clause_data::unspec)
+            if (x != clause_data::unspec) {
                 return false;
+            }
         }
         return true;
     }
 
-    std::optional<size_t> unit() {
+    std::optional<size_t> unit()
+    {
         // {} if it isn't
         // index of truth value if it is
         bool indicator = false;
@@ -131,6 +138,7 @@ struct Formula {
                 case clause_data::negated:
                     std::cout << '!' << literal + 1 << '|';
                     break;
+                case clause_data::unspec: ;
                 }
             }
             std::cout << ')';
@@ -148,11 +156,11 @@ struct Formula {
             case clause_data::negated:
                 std::cout << x + 1 << "=0, ";
                 break;
+            case clause_data::unspec:;
             }
         }
         std::cout << std::endl;
     }
-
 
     void unit_propagate_group(clause units)
     {
@@ -166,7 +174,8 @@ struct Formula {
         formula = f;
     }
 
-    void unit_propagate_single(size_t index, clause_data polarity) {
+    void unit_propagate_single(size_t index, clause_data polarity)
+    {
         std::vector<clause> f; f.reserve(formula.size());
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_one(index, polarity)) {
@@ -209,9 +218,9 @@ struct Formula {
             bool b2 = false;
             for (auto&& el : formula) {
                 switch (el.term[i]) {
-                    case clause_data::normal: b1 = true;
-                    case clause_data::negated: b2 = true;
-                    case clause_data::unspec: ;
+                case clause_data::normal: b1 = true;
+                case clause_data::negated: b2 = true;
+                case clause_data::unspec: ;
                 }
             }
             if (!b1 and b2) {
@@ -262,23 +271,25 @@ bool recursive_DPLL(Formula& expr)
         if (!units.has_value()) {
             return false; // contradiction
         }
- 
+
         // do we have to check?
         for (size_t i = 0; i < expr.clause_length; ++i) {
             if (expr.solution.term[i] != clause_data::unspec &&
                 expr.solution.term[i] != units.value().term[i]
-            ) return false;
+               ) {
+                return false;
+            }
             expr.solution.term[i] = units.value().term[i];
         }
-    
+
         expr.unit_propagate_group(units.value());
     }
-    
+
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
         expr.solution.term[p.value()] = clause_data::normal;
         expr.unit_propagate_single(p.value(), clause_data::normal);
-        
+
         if (recursive_DPLL(expr)) {
             return true;
         } else {
