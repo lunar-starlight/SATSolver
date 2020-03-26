@@ -22,6 +22,8 @@ constexpr Literal neg(const Literal& lit)
         return std::make_pair(literal, clause_data::negated);
     case clause_data::negated:
         return std::make_pair(literal, clause_data::normal);
+    default:
+        __builtin_unreachable();
     }
 }
 
@@ -44,17 +46,18 @@ struct clause {
     clause(const Literal& lit) : term(LENGTH, clause_data::unspec)
     {
         auto [literal, polarity] = lit;
-        term[literal] = polarity;
+        term.at(literal) = polarity;
     }
 
     std::optional<clause> unit_propagate(const std::map<int, clause_data>& units)
     {
-        for (int literal = 0; literal < term.size(); literal++) {
-            if (units.find(literal) == units.end()) {
-            } else if (units.at(literal) == term[literal]) {
-                return std::nullopt;
-            } else {
-                term[literal] = clause_data::unspec;
+        for (int literal = 0; literal < LENGTH; literal++) {
+            if (units.find(literal) != units.end()) {
+                if (units.at(literal) == term.at(literal)) {
+                    return std::nullopt;
+                } else {
+                    term.at(literal) = clause_data::unspec;
+                }
             }
         }
         return *this;
@@ -63,34 +66,33 @@ struct clause {
     std::optional<clause> unit_propagate(const Literal& lit) const
     {
         auto [literal, polarity] = lit;
-        if (term[literal] == clause_data::unspec) {
+        if (term.at(literal) == clause_data::unspec) {
             return *this;
-        } else if (term[literal] == polarity) {
+        } else if (term.at(literal) == polarity) {
             return std::nullopt;
         } else {
             clause cl(*this); // TODO: remove expensive copy
-            cl.term[literal] = clause_data::unspec;
+            cl.term.at(literal) = clause_data::unspec;
             return cl;
         }
     }
 
     std::optional<Literal> unit() const
     {
-
         bool b = false;
         int k;
-        for (int i = 0; i < LENGTH; i++) {
-            if (term[i] != clause_data::unspec) {
+        for (int literal = 0; literal < LENGTH; literal++) {
+            if (term.at(literal) != clause_data::unspec) {
                 if (b) {
                     b = false;
                     break;
                 }
                 b = true;
-                k = i;
+                k = literal;
             }
         }
         if (b) {
-            return std::make_pair(k, term[k]);
+            return std::make_pair(k, term.at(k));
         } else {
             return std::nullopt;
         }
@@ -98,7 +100,7 @@ struct clause {
 
     bool has_term(const Literal& lit) const
     {
-        return term[lit.first] != clause_data::unspec;
+        return term.at(lit.first) != clause_data::unspec;
     }
 
 };
@@ -112,13 +114,14 @@ struct Formula {
         for (auto&& cl : formula) {
             std::cout << "(|";
             for (int literal = 0; literal < LENGTH; literal++) {
-                switch (cl.term[literal]) {
+                switch (cl.term.at(literal)) {
                 case clause_data::normal:
                     std::cout << literal + 1 << '|';
                     break;
                 case clause_data::negated:
                     std::cout << '!' << literal + 1 << '|';
                     break;
+                default:;
                 }
             }
             std::cout << ')';
@@ -135,6 +138,7 @@ struct Formula {
             case clause_data::negated:
                 std::cout << literal + 1 << "=0, ";
                 break;
+            default:;
             }
         }
         std::cout << std::endl;
@@ -212,7 +216,7 @@ struct Formula {
     {
         for (auto&& cl : formula) {
             for (int literal = 0; literal < LENGTH; ++literal) {
-                if (cl.term[literal] != clause_data::unspec) {
+                if (cl.term.at(literal) != clause_data::unspec) {
                     return std::make_pair(std::make_pair(literal, clause_data::negated), std::make_pair(literal, clause_data::normal));
                 }
             }
@@ -236,13 +240,18 @@ struct Formula {
         if (contains_empty_clause()) {
             return false;
         }
-        for (auto units = unit_clauses(); !units.has_value() || !(*units).empty(); units = unit_clauses()) {
+        std::cerr << "pre" << std::endl;
+        auto units = unit_clauses();
+        std::cerr << "post" << std::endl;
+        for (; !units.has_value() || !(*units).empty(); units = unit_clauses()) {
+            // std::cerr << 'h' << std::endl;
             if (!units.has_value()) {
                 return false; // contradiction
             }
             solution.insert((*units).begin(), (*units).end());
             unit_propagate((*units));
         }
+        // std::cerr << "post" << std::endl;
 
         if (auto p = choose_literal()) {
             Formula ff(*this); // copy for branch
@@ -292,7 +301,7 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
-    std::cout << formula.DPLL() << '\n';
+    std::cout << formula.DPLL() << std::endl;
 
     return 0;
 }
