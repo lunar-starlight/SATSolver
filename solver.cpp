@@ -63,7 +63,7 @@ struct clause {
         return *this;
     }
 
-    std::optional<clause> unit_propagate(const Literal& lit) const
+    std::optional<clause> unit_propagate(const Literal& lit)
     {
         auto [literal, polarity] = lit;
         if (term.at(literal) == clause_data::unspec) {
@@ -71,9 +71,8 @@ struct clause {
         } else if (term.at(literal) == polarity) {
             return std::nullopt;
         } else {
-            clause cl(*this); // TODO: remove expensive copy
-            cl.term.at(literal) = clause_data::unspec;
-            return cl;
+            term.at(literal) = clause_data::unspec;
+            return *this;
         }
     }
 
