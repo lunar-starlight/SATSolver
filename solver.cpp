@@ -83,12 +83,8 @@ struct clause {
         }
     }
 
-<<<<<<< HEAD
-    bool empty() const {
-=======
     bool empty() const
     {
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
         for (auto&& x : term) {
             if (x != clause_data::unspec) {
                 return false;
@@ -158,13 +154,9 @@ struct Formula {
             case clause_data::negated:
                 std::cout << x + 1 << "=0, ";
                 break;
-<<<<<<< HEAD
             case clause_data::unspec:
                 std::cout << x + 1 << "=?, ";
                 break;
-=======
-            case clause_data::unspec:;
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
             }
         }
         std::cout << std::endl;
@@ -201,11 +193,7 @@ struct Formula {
 
         // note check for contradiction
         for (auto&& e : formula) {
-<<<<<<< HEAD
             if (auto p = e.unit()) {
-=======
-            if (auto p = e.unit(); p.has_value()) {
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
                 // e[p] is unital then
                 if (units.term[p.value()] != clause_data::unspec &&
                     units.term[p.value()] != e.term[p.value()]) {
@@ -231,15 +219,9 @@ struct Formula {
             bool b2 = false;
             for (auto&& el : formula) {
                 switch (el.term[i]) {
-<<<<<<< HEAD
-                    case clause_data::normal: b1 = true; break;
-                    case clause_data::negated: b2 = true;
-                    case clause_data::unspec: ;
-=======
-                case clause_data::normal: b1 = true;
+                case clause_data::normal: b1 = true; break;
                 case clause_data::negated: b2 = true;
                 case clause_data::unspec: ;
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
                 }
             }
             if (!b1 and b2) {
@@ -292,14 +274,9 @@ bool DPLL(Formula& expr)
         }
 
         for (size_t i = 0; i < expr.clause_length; ++i) {
-<<<<<<< HEAD
-            if (units.value().term[i] != clause_data::unspec)
-                expr.solution.term[i] = units.value().term[i];
-=======
             if (units.value().term[i] != clause_data::unspec) {
                 expr.solution.term[i] = units.value().term[i];
             }
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
         }
 
         expr.unit_propagate_group(units.value());
@@ -326,26 +303,11 @@ bool DPLL(Formula& expr)
             return DPLL(ff);
         }
     } else {
-<<<<<<< HEAD
         expr.print_solution(); // remove duplication.
-=======
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
         return expr.formula.empty();
     }
 }
 
-<<<<<<< HEAD
-bool DPLL(Formula& expr)
-{
-    auto pures = expr.pure_literals();
-    expr.solution = pures;
-    expr.unit_propagate_group(pures);
-    bool x = recursive_DPLL(expr);
-    return x;
-}
-
-=======
->>>>>>> 84cc194b261523c16f4352e29688332a0475e542
 Formula parse(/*stdin*/)
 {
     char end_of_comment;
