@@ -12,8 +12,8 @@ enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
 
-std::vector<int> normal;
-std::vector<int> negated;
+std::vector<int> NORMAL;
+std::vector<int> NEGATED;
 
 Literal neg(const Literal& lit)
 {
@@ -41,10 +41,10 @@ struct clause {
         while ((std::cin >> reader) && reader) {
             if (reader > 0) {
                 term[reader - 1] = clause_data::normal;
-                ++normal[reader - 1];
+                ++NORMAL[reader - 1];
             } else {
                 term[-reader - 1] = clause_data::negated;
-                ++negated[-reader - 1];
+                ++NEGATED[-reader - 1];
             }
         }
     }
@@ -78,8 +78,8 @@ struct clause {
 
     std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity)
     {
-        normal[lit] = 0;
-        negated[lit] = 0;
+        NORMAL[lit] = 0;
+        NEGATED[lit] = 0;
         if (term[lit] == clause_data::unspec) {
             return *this;
         } else if (term[lit] == polarity) {
@@ -130,6 +130,8 @@ struct Formula {
     std::vector<clause> formula;
     size_t clause_length;
     clause solution;
+    std::vector<int> normal;
+    std::vector<int> negated;
 
     void print() const
     {
@@ -276,12 +278,19 @@ struct Formula {
 
     std::optional<size_t> choose_literal() const
     {
+        int m = 0;
+        int i = 0;
         for (size_t literal = 0; literal < clause_length; ++literal) {
-            if (normal[literal] + negated[literal] > 0) {
-                return literal;
+            if (normal[literal] + negated[literal] > m) {
+                m = normal[literal] + negated[literal];
+                i = literal;
             }
         }
-        return std::nullopt;
+        if (m == 0) {
+            return std::nullopt;
+        } else {
+            return i;
+        }
     }
 };
 
@@ -320,6 +329,7 @@ bool DPLL(Formula& expr)
             return DPLL(ff);
         }
     } else {
+        // expr.print();
         return expr.formula.empty();
     }
 }
@@ -343,12 +353,15 @@ Formula parse(/*stdin*/)
     f.formula.reserve(number_of_clauses);
     f.solution.term.resize(number_of_variables, clause_data::unspec);
 
-    normal.resize(number_of_variables, 0);
-    negated.resize(number_of_variables, 0);
+    NORMAL.resize(number_of_variables, 0);
+    NEGATED.resize(number_of_variables, 0);
 
     for (int i = 0; i < number_of_clauses; ++i) {
         f.formula.emplace_back(number_of_variables /*, stdin*/);
     }
+
+    f.normal = NORMAL;
+    f.negated = NEGATED;
 
     return f;
 }
