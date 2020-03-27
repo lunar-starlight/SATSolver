@@ -12,6 +12,9 @@ enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
 
+std::vector<int> normal;
+std::vector<int> negated;
+
 Literal neg(const Literal& lit)
 {
     auto [literal, polarity] = lit;
@@ -38,8 +41,10 @@ struct clause {
         while ((std::cin >> reader) && reader) {
             if (reader > 0) {
                 term[reader - 1] = clause_data::normal;
+                ++normal[reader - 1];
             } else {
                 term[-reader - 1] = clause_data::negated;
+                ++negated[-reader - 1];
             }
         }
     }
@@ -73,6 +78,8 @@ struct clause {
 
     std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity)
     {
+        normal[lit] = 0;
+        negated[lit] = 0;
         if (term[lit] == clause_data::unspec) {
             return *this;
         } else if (term[lit] == polarity) {
@@ -167,6 +174,25 @@ struct Formula {
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_group(units)) {
                 f.push_back(*cl);
+            } else {
+                for (int literal = 0; literal < clause_length; literal++) {
+                    switch (e.term[literal]) {
+                    case clause_data::normal:
+                        --normal[literal];
+                        break;
+                    case clause_data::negated:
+                        --negated[literal];
+                        break;
+                    case clause_data::unspec: ;
+                    }
+                }
+            }
+        }
+        for (size_t i = 0; i < clause_length; ++i) {
+            if (units.term[i] != clause_data::unspec) {
+                solution.term[i] = units.term[i];
+                normal[i] = 0;
+                negated[i] = 0;
             }
         }
         formula = f;
@@ -178,8 +204,23 @@ struct Formula {
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_one(index, polarity)) {
                 f.push_back(*cl);
+            } else {
+                for (int literal = 0; literal < clause_length; literal++) {
+                    switch (e.term[literal]) {
+                    case clause_data::normal:
+                        --normal[literal];
+                        break;
+                    case clause_data::negated:
+                        --negated[literal];
+                        break;
+                    case clause_data::unspec: ;
+                    }
+                }
             }
         }
+        solution.term[index] = polarity;
+        normal[index] = 0;
+        negated[index] = 0;
         formula = f;
     }
 
@@ -213,19 +254,10 @@ struct Formula {
         pure.term.resize(clause_length, clause_data::unspec);
 
         for (size_t i = 0; i < clause_length; ++i) {
-            bool b1 = false;
-            bool b2 = false;
-            for (auto&& el : formula) {
-                switch (el.term[i]) {
-                case clause_data::normal: b1 = true;
-                case clause_data::negated: b2 = true;
-                case clause_data::unspec: ;
-                }
-            }
-            if (!b1 and b2) {
+            if (normal[i] == 0 and negated[i] > 0) {
                 pure.term[i] = clause_data::negated;
             }
-            if (b1 and !b2) {
+            if (normal[i] > 0 and negated[i] == 0) {
                 pure.term[i] = clause_data::normal;
             }
         }
@@ -244,11 +276,9 @@ struct Formula {
 
     std::optional<size_t> choose_literal() const
     {
-        for (auto&& cl : formula) {
-            for (size_t literal = 0; literal < clause_length; ++literal) {
-                if (cl.term[literal] != clause_data::unspec) {
-                    return literal;
-                }
+        for (size_t literal = 0; literal < clause_length; ++literal) {
+            if (normal[literal] + negated[literal] > 0) {
+                return literal;
             }
         }
         return std::nullopt;
@@ -271,21 +301,10 @@ bool DPLL(Formula& expr)
             return false; // contradiction
         }
 
-        for (size_t i = 0; i < expr.clause_length; ++i) {
-            if (units.value().term[i] != clause_data::unspec) {
-                expr.solution.term[i] = units.value().term[i];
-            }
-        }
-
         expr.unit_propagate_group(units.value());
     }
 
     auto pures = expr.pure_literals();
-    for (size_t i = 0; i < expr.clause_length; ++i) {
-        if (pures.term[i] != clause_data::unspec) {
-            expr.solution.term[i] = pures.term[i];
-        }
-    }
     expr.unit_propagate_group(pures);
 
     if (auto p = expr.choose_literal()) {
@@ -323,6 +342,9 @@ Formula parse(/*stdin*/)
     f.clause_length = number_of_variables;
     f.formula.reserve(number_of_clauses);
     f.solution.term.resize(number_of_variables, clause_data::unspec);
+
+    normal.resize(number_of_variables, 0);
+    negated.resize(number_of_variables, 0);
 
     for (int i = 0; i < number_of_clauses; ++i) {
         f.formula.emplace_back(number_of_variables /*, stdin*/);
