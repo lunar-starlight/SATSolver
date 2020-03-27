@@ -18,7 +18,6 @@ std::vector<int> NEGATED;
 Literal neg(const Literal& lit)
 {
     auto [literal, polarity] = lit;
-    std::cerr << "as";
     switch (polarity) {
     case clause_data::normal:
         return std::make_pair(literal, clause_data::negated);
@@ -26,7 +25,6 @@ Literal neg(const Literal& lit)
         return std::make_pair(literal, clause_data::normal);
     case clause_data::unspec: ;
     }
-    std::cerr << "test";
     __builtin_unreachable();
 }
 
@@ -200,8 +198,9 @@ struct Formula {
         formula = f;
     }
 
-    void unit_propagate_single(size_t index, clause_data polarity)
+    void unit_propagate_single(const Literal& lit)
     {
+        auto [index, polarity] = lit;
         std::vector<clause> f; f.reserve(formula.size());
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_one(index, polarity)) {
@@ -276,7 +275,7 @@ struct Formula {
         return false;
     }
 
-    std::optional<size_t> choose_literal() const
+    std::optional<Literal> choose_literal() const
     {
         int m = 0;
         int i = 0;
@@ -289,7 +288,7 @@ struct Formula {
         if (m == 0) {
             return std::nullopt;
         } else {
-            return i;
+            return std::make_pair(i, normal[i] > negated[i] ? clause_data::normal : clause_data::negated);
         }
     }
 };
@@ -305,6 +304,7 @@ bool DPLL(Formula& expr)
     }
     // !units.has_value() || !(*units).empty();
     // {} or it has actual values
+    // std::cerr << "pre" << std::endl;
     for (auto units = expr.unit_clauses(); !units.has_value() || !units.value().empty(); units = expr.unit_clauses()) {
         if (!units.has_value()) {
             return false; // contradiction
@@ -312,20 +312,21 @@ bool DPLL(Formula& expr)
 
         expr.unit_propagate_group(units.value());
     }
+    // std::cerr << "post" << std::endl;
 
-    auto pures = expr.pure_literals();
-    expr.unit_propagate_group(pures);
+    // auto pures = expr.pure_literals();
+    // expr.unit_propagate_group(pures);
 
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
-        expr.solution.term[p.value()] = clause_data::normal;
-        expr.unit_propagate_single(p.value(), clause_data::normal);
+        expr.solution.term[p.value().first] = p.value().second;
+        expr.unit_propagate_single(p.value());
 
         if (DPLL(expr)) {
             return true;
         } else {
-            ff.solution.term[p.value()] = clause_data::negated;
-            ff.unit_propagate_single(p.value(), clause_data::negated);
+            expr.solution.term[p.value().first] = neg(p.value()).second;
+            ff.unit_propagate_single(neg(p.value()));
             return DPLL(ff);
         }
     } else {
