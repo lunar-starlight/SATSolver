@@ -81,7 +81,7 @@ struct clause {
         }
     }
 
-    bool empty() {
+    bool empty() const {
         for (auto&& x : term) {
             if (x != clause_data::unspec)
                 return false;
@@ -148,6 +148,9 @@ struct Formula {
             case clause_data::negated:
                 std::cout << x + 1 << "=0, ";
                 break;
+            case clause_data::unspec:
+                std::cout << x + 1 << "=?, ";
+                break;
             }
         }
         std::cout << std::endl;
@@ -184,7 +187,7 @@ struct Formula {
 
         // note check for contradiction
         for (auto&& e : formula) {
-            if (auto p = e.unit(); p.has_value()) { // has_value unnecessary?
+            if (auto p = e.unit()) {
                 // e[p] is unital then
                 if (units.term[p.value()] != clause_data::unspec &&
                     e.term[p.value()] != units.term[p.value()])
@@ -209,7 +212,7 @@ struct Formula {
             bool b2 = false;
             for (auto&& el : formula) {
                 switch (el.term[i]) {
-                    case clause_data::normal: b1 = true;
+                    case clause_data::normal: b1 = true; break;
                     case clause_data::negated: b2 = true;
                     case clause_data::unspec: ;
                 }
@@ -227,7 +230,7 @@ struct Formula {
     bool contains_empty_clause() const
     {
         for (auto&& cl : formula) {
-            if (cl.term.empty()) {
+            if (cl.empty()) {
                 return true;
             }
         }
@@ -265,10 +268,8 @@ bool recursive_DPLL(Formula& expr)
  
         // do we have to check?
         for (size_t i = 0; i < expr.clause_length; ++i) {
-            if (expr.solution.term[i] != clause_data::unspec &&
-                expr.solution.term[i] != units.value().term[i]
-            ) return false;
-            expr.solution.term[i] = units.value().term[i];
+            if (units.value().term[i] != clause_data::unspec)
+                expr.solution.term[i] = units.value().term[i];
         }
     
         expr.unit_propagate_group(units.value());
@@ -287,7 +288,8 @@ bool recursive_DPLL(Formula& expr)
             return recursive_DPLL(ff);
         }
     } else {
-        return recursive_DPLL(expr);
+        expr.print_solution(); // remove duplication.
+        return expr.formula.empty();
     }
 }
 
@@ -296,7 +298,8 @@ bool DPLL(Formula& expr)
     auto pures = expr.pure_literals();
     expr.solution = pures;
     expr.unit_propagate_group(pures);
-    return recursive_DPLL(expr);
+    bool x = recursive_DPLL(expr);
+    return x;
 }
 
 Formula parse(/*stdin*/)
