@@ -44,8 +44,7 @@ struct clause {
         }
     }
 
-
-    clause(const clause& cl) : term(cl.term) {}
+    // clause(const clause& cl) : term(cl.term) {}
     /*
     clause(const Literal& lit) : term(LENGTH, clause_data::unspec)
     {
@@ -55,7 +54,7 @@ struct clause {
 
     std::optional<clause> unit_propagate_group(clause units)
     {
-        clause cl(*this); // make lazy construction?
+        // clause cl(*this); // make lazy construction?
 
         for (auto literal = 0ul; literal < term.size(); ++literal) {
             if (units.term[literal] == clause_data::unspec) {
@@ -66,26 +65,25 @@ struct clause {
             if (units.term[literal] == term[literal]) {
                 return std::nullopt;
             } else { //if clause contains negation
-                cl.term[literal] = clause_data::unspec;
+                term[literal] = clause_data::unspec;
             }
         }
-        return cl;
+        return *this;
     }
 
-    std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity) const
+    std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity)
     {
         if (term[lit] == clause_data::unspec) {
             return *this;
         } else if (term[lit] == polarity) {
             return std::nullopt;
         } else {
-            clause cl(*this); // TODO: remove expensive copy
-            cl.term[lit] = clause_data::unspec;
-            return cl;
+            term[lit] = clause_data::unspec;
+            return *this;
         }
     }
 
-    bool empty()
+    bool empty() const
     {
         for (auto&& x : term) {
             if (x != clause_data::unspec) {
@@ -193,11 +191,12 @@ struct Formula {
 
         // note check for contradiction
         for (auto&& e : formula) {
-            if (auto p = e.unit(); p.has_value()) { // has_value unnecessary?
+            if (auto p = e.unit(); p.has_value()) {
                 // e[p] is unital then
                 if (units.term[p.value()] != clause_data::unspec &&
-                    e.term[p.value()] != units.term[p.value()])
+                    units.term[p.value()] != e.term[p.value()]) {
                     return {}; // contradiction
+                }
                 units.term[p.value()] = e.term[p.value()];
             }
         }
@@ -236,7 +235,7 @@ struct Formula {
     bool contains_empty_clause() const
     {
         for (auto&& cl : formula) {
-            if (cl.term.empty()) {
+            if (cl.empty()) {
                 return true;
             }
         }
@@ -257,7 +256,7 @@ struct Formula {
 };
 
 
-bool recursive_DPLL(Formula& expr)
+bool DPLL(Formula& expr)
 {
     if (expr.formula.empty()) {
         return true;
@@ -272,42 +271,38 @@ bool recursive_DPLL(Formula& expr)
             return false; // contradiction
         }
 
-        // do we have to check?
         for (size_t i = 0; i < expr.clause_length; ++i) {
-            if (expr.solution.term[i] != clause_data::unspec &&
-                expr.solution.term[i] != units.value().term[i]
-               ) {
-                return false;
+            if (units.value().term[i] != clause_data::unspec) {
+                expr.solution.term[i] = units.value().term[i];
             }
-            expr.solution.term[i] = units.value().term[i];
         }
 
         expr.unit_propagate_group(units.value());
     }
+
+    auto pures = expr.pure_literals();
+    for (size_t i = 0; i < expr.clause_length; ++i) {
+        if (pures.term[i] != clause_data::unspec) {
+            expr.solution.term[i] = pures.term[i];
+        }
+    }
+    expr.unit_propagate_group(pures);
 
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
         expr.solution.term[p.value()] = clause_data::normal;
         expr.unit_propagate_single(p.value(), clause_data::normal);
 
-        if (recursive_DPLL(expr)) {
+        if (DPLL(expr)) {
             return true;
         } else {
             ff.solution.term[p.value()] = clause_data::negated;
             ff.unit_propagate_single(p.value(), clause_data::negated);
-            return recursive_DPLL(ff);
+            return DPLL(ff);
         }
     } else {
-        return recursive_DPLL(expr);
+        return expr.formula.empty();
     }
-}
-
-bool DPLL(Formula& expr)
-{
-    auto pures = expr.pure_literals();
-    expr.solution = pures;
-    expr.unit_propagate_group(pures);
-    return recursive_DPLL(expr);
 }
 
 Formula parse(/*stdin*/)
@@ -327,6 +322,7 @@ Formula parse(/*stdin*/)
     Formula f;
     f.clause_length = number_of_variables;
     f.formula.reserve(number_of_clauses);
+    f.solution.term.resize(number_of_variables, clause_data::unspec);
 
     for (int i = 0; i < number_of_clauses; ++i) {
         f.formula.emplace_back(number_of_variables /*, stdin*/);
