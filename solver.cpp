@@ -314,8 +314,8 @@ bool DPLL(Formula& expr)
     }
     // std::cerr << "post" << std::endl;
 
-    // auto pures = expr.pure_literals();
-    // expr.unit_propagate_group(pures);
+    auto pures = expr.pure_literals();
+    expr.unit_propagate_group(pures);
 
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
