@@ -15,7 +15,6 @@ typedef std::pair<int, clause_data> Literal;
 Literal neg(const Literal& lit)
 {
     auto [literal, polarity] = lit;
-    std::cerr << "as";
     switch (polarity) {
     case clause_data::normal:
         return std::make_pair(literal, clause_data::negated);
@@ -256,7 +255,6 @@ struct Formula {
         return std::nullopt;
     }
 };
-
 
 bool DPLL(Formula& expr)
 {
