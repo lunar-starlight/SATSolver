@@ -371,7 +371,20 @@ int main()
 {
     auto formula = parse(/*stdin*/);
 
-    std::cout << DPLL(formula) << '\n';
+    if (DPLL(formula)) {
+        for (int i = 0; i < formula.clause_length; ++i) {
+            switch (formula.solution.term[i]) {
+            case clause_data::normal:
+                std::cout << i + 1 << ' ';
+            case clause_data::negated:
+                std::cout << -(i + 1) << ' ';
+            case clause_data::unspec: ;
+            }
+        }
+    } else {
+        std::cout << 0;
+    }
+    std::cout << '\n';
 
     return 0;
 }
