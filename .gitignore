@@ -31,7 +31,5 @@
 *.out
 *.app
 
-hw_files/
-blocksworld/
-.vscode
-Beijing/
+tests/
+.vscode/

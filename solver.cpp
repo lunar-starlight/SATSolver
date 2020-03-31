@@ -12,6 +12,9 @@ enum class clause_data : int8_t { normal, negated, unspec };
 
 typedef std::pair<int, clause_data> Literal;
 
+std::vector<int> NORMAL;
+std::vector<int> NEGATED;
+
 Literal neg(const Literal& lit)
 {
     auto [literal, polarity] = lit;
@@ -22,7 +25,6 @@ Literal neg(const Literal& lit)
         return std::make_pair(literal, clause_data::normal);
     case clause_data::unspec: ;
     }
-    std::cerr << "test";
     __builtin_unreachable();
 }
 
@@ -37,8 +39,10 @@ struct clause {
         while ((std::cin >> reader) && reader) {
             if (reader > 0) {
                 term[reader - 1] = clause_data::normal;
+                ++NORMAL[reader - 1];
             } else {
                 term[-reader - 1] = clause_data::negated;
+                ++NEGATED[-reader - 1];
             }
         }
     }
@@ -72,6 +76,8 @@ struct clause {
 
     std::optional<clause> unit_propagate_one(size_t lit, clause_data polarity)
     {
+        NORMAL[lit] = 0;
+        NEGATED[lit] = 0;
         if (term[lit] == clause_data::unspec) {
             return *this;
         } else if (term[lit] == polarity) {
@@ -122,6 +128,8 @@ struct Formula {
     std::vector<clause> formula;
     size_t clause_length;
     clause solution;
+    std::vector<int> normal;
+    std::vector<int> negated;
 
     void print() const
     {
@@ -168,19 +176,54 @@ struct Formula {
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_group(units)) {
                 f.push_back(*cl);
+            } else {
+                for (int literal = 0; literal < clause_length; literal++) {
+                    switch (e.term[literal]) {
+                    case clause_data::normal:
+                        --normal[literal];
+                        break;
+                    case clause_data::negated:
+                        --negated[literal];
+                        break;
+                    case clause_data::unspec: ;
+                    }
+                }
+            }
+        }
+        for (size_t i = 0; i < clause_length; ++i) {
+            if (units.term[i] != clause_data::unspec) {
+                solution.term[i] = units.term[i];
+                normal[i] = 0;
+                negated[i] = 0;
             }
         }
         formula = f;
     }
 
-    void unit_propagate_single(size_t index, clause_data polarity)
+    void unit_propagate_single(const Literal& lit)
     {
+        auto [index, polarity] = lit;
         std::vector<clause> f; f.reserve(formula.size());
         for (auto&& e : formula) {
             if (auto cl = e.unit_propagate_one(index, polarity)) {
                 f.push_back(*cl);
+            } else {
+                for (int literal = 0; literal < clause_length; literal++) {
+                    switch (e.term[literal]) {
+                    case clause_data::normal:
+                        --normal[literal];
+                        break;
+                    case clause_data::negated:
+                        --negated[literal];
+                        break;
+                    case clause_data::unspec: ;
+                    }
+                }
             }
         }
+        solution.term[index] = polarity;
+        normal[index] = 0;
+        negated[index] = 0;
         formula = f;
     }
 
@@ -214,19 +257,10 @@ struct Formula {
         pure.term.resize(clause_length, clause_data::unspec);
 
         for (size_t i = 0; i < clause_length; ++i) {
-            bool b1 = false;
-            bool b2 = false;
-            for (auto&& el : formula) {
-                switch (el.term[i]) {
-                case clause_data::normal: b1 = true; break;
-                case clause_data::negated: b2 = true;
-                case clause_data::unspec: ;
-                }
-            }
-            if (!b1 and b2) {
+            if (normal[i] == 0 and negated[i] > 0) {
                 pure.term[i] = clause_data::negated;
             }
-            if (b1 and !b2) {
+            if (normal[i] > 0 and negated[i] == 0) {
                 pure.term[i] = clause_data::normal;
             }
         }
@@ -243,16 +277,21 @@ struct Formula {
         return false;
     }
 
-    std::optional<size_t> choose_literal() const
+    std::optional<Literal> choose_literal() const
     {
-        for (auto&& cl : formula) {
-            for (size_t literal = 0; literal < clause_length; ++literal) {
-                if (cl.term[literal] != clause_data::unspec) {
-                    return literal;
-                }
+        int m = 0;
+        int i = 0;
+        for (size_t literal = 0; literal < clause_length; ++literal) {
+            if (normal[literal] + negated[literal] > m) {
+                m = normal[literal] + negated[literal];
+                i = literal;
             }
         }
-        return std::nullopt;
+        if (m == 0) {
+            return std::nullopt;
+        } else {
+            return std::make_pair(i, normal[i] > negated[i] ? clause_data::normal : clause_data::negated);
+        }
     }
 };
 
@@ -266,42 +305,32 @@ bool DPLL(Formula& expr)
     }
     // !units.has_value() || !(*units).empty();
     // {} or it has actual values
+    // std::cerr << "pre" << std::endl;
     for (auto units = expr.unit_clauses(); !units.has_value() || !units.value().empty(); units = expr.unit_clauses()) {
         if (!units.has_value()) {
             return false; // contradiction
         }
 
-        for (size_t i = 0; i < expr.clause_length; ++i) {
-            if (units.value().term[i] != clause_data::unspec) {
-                expr.solution.term[i] = units.value().term[i];
-            }
-        }
-
         expr.unit_propagate_group(units.value());
     }
+    // std::cerr << "post" << std::endl;
 
     auto pures = expr.pure_literals();
-    for (size_t i = 0; i < expr.clause_length; ++i) {
-        if (pures.term[i] != clause_data::unspec) {
-            expr.solution.term[i] = pures.term[i];
-        }
-    }
     expr.unit_propagate_group(pures);
 
     if (auto p = expr.choose_literal()) {
         Formula ff(expr); // copy for branch
-        expr.solution.term[p.value()] = clause_data::normal;
-        expr.unit_propagate_single(p.value(), clause_data::normal);
+        expr.solution.term[p.value().first] = p.value().second;
+        expr.unit_propagate_single(p.value());
 
         if (DPLL(expr)) {
             return true;
         } else {
-            ff.solution.term[p.value()] = clause_data::negated;
-            ff.unit_propagate_single(p.value(), clause_data::negated);
+            expr.solution.term[p.value().first] = neg(p.value()).second;
+            ff.unit_propagate_single(neg(p.value()));
             return DPLL(ff);
         }
     } else {
-        expr.print_solution(); // remove duplication.
         return expr.formula.empty();
     }
 }
@@ -325,9 +354,15 @@ Formula parse(/*stdin*/)
     f.formula.reserve(number_of_clauses);
     f.solution.term.resize(number_of_variables, clause_data::unspec);
 
+    NORMAL.resize(number_of_variables, 0);
+    NEGATED.resize(number_of_variables, 0);
+
     for (int i = 0; i < number_of_clauses; ++i) {
         f.formula.emplace_back(number_of_variables /*, stdin*/);
     }
+
+    f.normal = NORMAL;
+    f.negated = NEGATED;
 
     return f;
 }
