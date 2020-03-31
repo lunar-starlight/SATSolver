@@ -161,7 +161,9 @@ struct Formula {
             case clause_data::negated:
                 std::cout << x + 1 << "=0, ";
                 break;
-            case clause_data::unspec:;
+            case clause_data::unspec:
+                std::cout << x + 1 << "=?, ";
+                break;
             }
         }
         std::cout << std::endl;
@@ -233,7 +235,7 @@ struct Formula {
 
         // note check for contradiction
         for (auto&& e : formula) {
-            if (auto p = e.unit(); p.has_value()) {
+            if (auto p = e.unit()) {
                 // e[p] is unital then
                 if (units.term[p.value()] != clause_data::unspec &&
                     units.term[p.value()] != e.term[p.value()]) {
@@ -293,7 +295,6 @@ struct Formula {
     }
 };
 
-
 bool DPLL(Formula& expr)
 {
     if (expr.formula.empty()) {
@@ -330,7 +331,6 @@ bool DPLL(Formula& expr)
             return DPLL(ff);
         }
     } else {
-        // expr.print();
         return expr.formula.empty();
     }
 }
